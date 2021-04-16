@@ -7,7 +7,6 @@ Purpose:        This Python script prepare IMU data for terrain classification.
 # Import relevant modules
 import os
 import glob
-import time
 from datetime import datetime
 
 import pandas as pd
@@ -18,7 +17,7 @@ from random import randrange
 from scipy.fft import fft, fftfreq
 from scipy.signal import sosfiltfilt, butter, welch
 
-import matplotlib.pyplot as plt
+from featuresLib import *
 
 # DEFINITIONS
 
@@ -61,14 +60,13 @@ SAMP_SLICE = 1024  # good practice for fft analysis: better to have a value that
 # LOW-PASS FILTER CUT-OFF FREQUENCY
 CUT_OFF = 20  # Low-pass cut-off frequency (Hz)
 
-# For small float values
-EPSILON = 0.00001
+# dictionary of time-domain features to use in feature extraction step
+time_features = {'Mean': np.mean, 'Std': np.std,  'Norm': l2norm,
+                 'Max': np.amax, 'Min': np.amin, 'RMS': rms, 'ZCR': zcr}
 
-# GET USER INPUT - DETERMINE WHETHER TO EXPORT PROCESSED DATA OR NOT
-EXPORT_PROCESSED_DATA = input('Do you want to export processed data? True/False? \n')
 
-# GET USER INPUT - CREATING TEST OR TRAIN DATA SET
-TeTr = input('Do you want to create a "Test" or "Train" set? \n')
+# dictionary of freq-domain features to use in feature extraction step
+freq_features = {'RMSF': rmsf, 'FC': fc, 'RVF': rvf}
 
 # Relative path of this file
 CURR_PATH = os.path.abspath('.')
@@ -78,6 +76,12 @@ glob_paths = glob.glob(os.path.join(CURR_PATH, 'imu_data', '*.csv'))
 
 # Remove 9250 9-axis IMU data (for now)
 glob_paths = [path for path in glob_paths if '9250' not in path]
+
+# GET USER INPUT - DETERMINE WHETHER TO EXPORT PROCESSED DATA OR NOT
+EXPORT_PROCESSED_DATA = input('Export processed data? True/False? \n')
+
+# GET USER INPUT - CREATING TEST OR TRAIN DATA SET
+TeTr = input('Do you want to create a "Test" or "Train" set? \n')
 
 
 def create_path_list(tetr):
@@ -144,46 +148,6 @@ def imported_datasets(tetr):
         datasets.update({dataset_label: dataset_im})
 
     return datasets
-
-
-def dataset_compare(dataset1, label1, dataset2, label2, y_axis, filtered=False):
-    """
-    Purpose: Plotting and compare one-axis measurement (e.g., X-acc) of two Pandas datasets over Run Time
-    """
-
-    # Plot parameters
-    plt.clf()
-    fig_c, ax_c = plt.subplots(figsize=(20, 5))
-    ax_c.set_xlabel('Run Time ($s$)')
-    ax_c.set_title(y_axis + ' for ' + label1 + ' and ' + label2)
-
-    # Add relevant units to y label
-    if 'Gyro' in y_axis:
-        ax_c.set_ylabel(y_axis + ' ($rad/s$)')
-    elif 'Accel' in y_axis:
-        ax_c.set_ylabel(y_axis + ' ($m/s^2$)')
-    elif 'Vel' in y_axis:
-        ax_c.set_ylabel(y_axis + ' ($m/s$)')
-    else:
-        ax_c.set_ylabel('Unknown')
-
-    # determine whether plotting filtered or raw data
-    if filtered:
-        legend1 = label1 + '_raw'
-        legend2 = label2 + '_filtered'
-    else:
-        legend1 = label1
-        legend2 = label2
-
-    # remove extra text in the labels
-    legend1 = legend1.replace('Middle_', '').replace('_Module6050', '')
-    legend2 = legend2.replace('Middle_', '').replace('_Module6050', '')
-
-    ax_c.plot(dataset1[label1][y_axis], label=legend1)
-    ax_c.plot(dataset2[label2][y_axis], label=legend2)
-
-    ax_c.legend()
-    plt.show()
 
 
 def pd_to_np(pd_datasets, windowed=False):
@@ -431,23 +395,6 @@ def slice_window(datasets, overlap=True):
     return seg_datasets, win_datasets
 
 
-def win_plot(dic_1, dic_2):
-    """ plotting two consecutive segmented/windowed dataframe """
-
-    j = 0
-    fig, ax = plt.subplots(2, 1, figsize=(8, 6))
-
-    for i in range(30, 32):
-        ax[j].plot(dic_1[dataset_labels[0]][i]['X Accel'], label='filtered')
-        ax[j].plot(dic_2[dataset_labels[0]][i]['X Accel'], label='windowed')
-        ax[j].legend()
-        ax[j].set_xlabel('index')
-        ax[j].set_ylabel('segmented window #{}'.format(i))
-        j += 1
-
-    plt.show()
-
-
 def fft_transform(datasets):
 
     """function to create a dictionary of all FFT'd dataframes"""
@@ -528,32 +475,6 @@ def psd_transform(datasets):
     return psd_dic
 
 
-def plot_transforms(fft_, psd_):
-
-    """function to visualise a random window of a random dataset from fft/psd transforms"""
-
-    # choose a random dataframe
-    i = randrange(len(fft_)-1)
-    j = randrange(len(fft_[dataset_labels[i]])-1)
-
-    df_fft = fft_[dataset_labels[i]][j]
-    df_psd = psd_[dataset_labels[i]][j]
-
-    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
-
-    for col in data_columns:
-        ax[0].plot(df_fft['frequency'], df_fft[col], label=col)
-        ax[1].plot(df_psd['frequency'], df_psd[col], label=col)
-
-    ax[0].set_xlabel('frequency (hz)')
-    ax[1].set_xlabel('frequency (hz)')
-    ax[0].set_ylabel('fft')
-    ax[1].set_ylabel('psd')
-    ax[0].legend()
-    ax[1].legend()
-    plt.show()
-
-
 def trim_transforms(datasets, freq_thresh):
 
     """function to remove excessive frequency bins of fft & psd dataframes"""
@@ -569,22 +490,6 @@ def trim_transforms(datasets, freq_thresh):
 
         datasets_trimmed.update({label: dataset_trimmed_list})
     return datasets_trimmed
-
-
-def l2norm(array):
-    """L2 norm of an array"""
-    return np.linalg.norm(array, ord=2)
-
-
-def rms(array):
-    """Root mean squared of an array"""
-    return np.sqrt(np.mean(array ** 2))
-
-
-def zcr(array):
-    """Zero crossing rate of an array as a fraction of total size of array"""
-    # divide by total datapoints in window
-    return len(np.nonzero(np.diff(np.sign(array)))[0]) / len(array)
 
 
 def feature_extraction(datasets, features_dic, freq_domain=False):
@@ -643,53 +548,6 @@ def feature_extraction(datasets, features_dic, freq_domain=False):
 
     return feat_datasets
 
-
-# dictionary of time-domain features to use in feature extraction step
-time_features = {'Mean': np.mean, 'Std': np.std,  'Norm': l2norm,
-                 'Max': np.amax, 'Min': np.amin, 'RMS': rms, 'ZCR': zcr}
-
-
-def msf(freqs, psd_amps):
-    """Mean square frequency"""
-    num = np.sum(np.multiply(np.resize(np.power(freqs, 2), len(psd_amps)), psd_amps))
-    denom = np.sum(psd_amps)
-
-    # In case zero amplitude transform is ecountered
-    if denom <= EPSILON:
-        return EPSILON
-
-    return np.divide(num, denom)
-
-
-def rmsf(freqs, psd_amps):
-    """Root mean square frequency"""
-    return np.sqrt(msf(freqs, psd_amps))
-
-
-def fc(freqs, psd_amps):
-    """Frequency center"""
-    num = np.sum(np.multiply(np.resize(freqs, len(psd_amps)), psd_amps))
-    denom = np.sum(psd_amps)
-
-    # In case zero amplitude transform is ecountered
-    if denom <= EPSILON:
-        return EPSILON
-
-    return np.divide(num, denom)
-
-
-def vf(freqs, psd_amps):
-    """Variance frequency"""
-    return msf(freqs-fc(freqs, psd_amps), psd_amps)
-
-
-def rvf(freqs, psd_amps):
-    """Root variance frequency"""
-    return np.sqrt(msf(freqs, psd_amps))
-
-
-# dictionary of freq-domain features to use in feature extraction step
-freq_features = {'RMSF': rmsf, 'FC': fc, 'RVF': rvf}
 
 def append_all_columns(columns, append_tag):
 
@@ -862,11 +720,11 @@ psd_datasets_trimmed = trim_transforms(psd_datasets, CUT_OFF + 10)
 
 # Part 5 - Feature Engineering
 time_featured_datasets = feature_extraction(segmented_datasets, time_features)  # dictionary of feature extracted dfs
-freq_featured_datasets = feature_extraction(psd_datasets_trimmed, freq_features, freq_domain=True) #dic freq feature extracted dataframes
+freq_featured_datasets = feature_extraction(psd_datasets_trimmed, freq_features, freq_domain=True)  # freq features df
 
 # Part 6 - Columning, Combination
-columned_time_feat_datasets = combine_extracted_columns(time_featured_datasets)  # Take time feature data and combine axes columns
-columned_freq_feat_datasets = combine_extracted_columns(freq_featured_datasets)  # Take frequency feature data and axes columns
+columned_time_feat_datasets = combine_extracted_columns(time_featured_datasets)  # combine time feat axes columns
+columned_freq_feat_datasets = combine_extracted_columns(freq_featured_datasets)  # combine frequency feat axes columns
 columned_fft_datasets = combine_transform_columns(fft_datasets_trimmed, 'FFT')  # create columned fft datasets
 columned_psd_datasets = combine_transform_columns(psd_datasets_trimmed, 'PSD')  # create columned psd datasets
 
@@ -884,7 +742,7 @@ psds = combine_datasets(labeled_psd_datasets)
 
 # Part 7 - Exporting Processed Data
 processed_path = os.path.join(CURR_PATH, 'processed_data', TeTr)  # Processed data path with power type folder
-os.makedirs(processed_path,exist_ok=True)
+os.makedirs(processed_path, exist_ok=True)
 
 # Store feature vectors in a dictionary
 vector_dict = {'TimeFeats': time_feats, 'FreqFeats': freq_feats, 'FFTs': ffts, 'PSDs': psds}
