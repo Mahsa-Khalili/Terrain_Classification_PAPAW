@@ -864,7 +864,7 @@ psd_datasets_trimmed = trim_transforms(psd_datasets, CUT_OFF + 10)
 time_featured_datasets = feature_extraction(segmented_datasets, time_features)  # dictionary of feature extracted dfs
 freq_featured_datasets = feature_extraction(psd_datasets_trimmed, freq_features, freq_domain=True) #dic freq feature extracted dataframes
 
-# Part 6 - Columning, Combination, and Standardization of Datasets
+# Part 6 - Columning, Combination
 columned_time_feat_datasets = combine_extracted_columns(time_featured_datasets)  # Take time feature data and combine axes columns
 columned_freq_feat_datasets = combine_extracted_columns(freq_featured_datasets)  # Take frequency feature data and axes columns
 columned_fft_datasets = combine_transform_columns(fft_datasets_trimmed, 'FFT')  # create columned fft datasets
@@ -882,8 +882,7 @@ freq_feats = combine_datasets(labeled_freq_feat_datasets)
 ffts = combine_datasets(labeled_fft_datasets)
 psds = combine_datasets(labeled_psd_datasets)
 
-
-# Part 9 - Exporting Processed Data
+# Part 7 - Exporting Processed Data
 processed_path = os.path.join(CURR_PATH, 'processed_data', TeTr)  # Processed data path with power type folder
 os.makedirs(processed_path,exist_ok=True)
 
