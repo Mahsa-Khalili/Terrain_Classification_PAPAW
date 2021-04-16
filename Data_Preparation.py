@@ -19,7 +19,6 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import sosfiltfilt, butter, welch
 
 import matplotlib.pyplot as plt
-from matplotlib import gridspec
 
 # DEFINITIONS
 
@@ -71,7 +70,6 @@ EXPORT_PROCESSED_DATA = input('Do you want to export processed data? True/False?
 # GET USER INPUT - CREATING TEST OR TRAIN DATA SET
 TeTr = input('Do you want to create a "Test" or "Train" set? \n')
 
-# Part 1 - Importing IMU measurements
 # Relative path of this file
 CURR_PATH = os.path.abspath('.')
     
@@ -82,11 +80,9 @@ glob_paths = glob.glob(os.path.join(CURR_PATH, 'imu_data', '*.csv'))
 glob_paths = [path for path in glob_paths if '9250' not in path]
 
 
-def create_path(tetr):
+def create_path_list(tetr):
     """
     Purpose: creating a homogeneous train/test datasets
-    :param tetr:
-    :return paths:
     """
 
     random.seed(0)
@@ -118,7 +114,7 @@ def imported_datasets(tetr):
     """
     datasets = {}  # creating an empty dictionary to store imported dataframes
 
-    dataset_paths = create_path(tetr)
+    dataset_paths = create_path_list(tetr)
 
     for dataset_path in dataset_paths:
 
@@ -148,23 +144,6 @@ def imported_datasets(tetr):
         datasets.update({dataset_label: dataset_im})
 
     return datasets
-
-
-# create a dictionary of imported datasets
-raw_datasets = imported_datasets(TeTr)
-
-# Sort dictionary according to keys
-raw_datasets = {label: raw_datasets[label] for label in sorted(raw_datasets.keys())}
-
-# Save list of keys to variable
-dataset_labels = list(raw_datasets.keys())
-# print('The total number of imported datasets: {}'.format(len(dataset_labels)))
-
-# # Check dataset formatting
-# print('sample data from the "{}" measurements '.format(dataset_labels[0]))
-# print(raw_datasets[dataset_labels[0]].head())
-
-# Part 2 - Visualizing Time Domain Data
 
 
 def dataset_compare(dataset1, label1, dataset2, label2, y_axis, filtered=False):
@@ -270,20 +249,6 @@ def np_to_pd(np_datasets, windowed=False):
     return pd_datasets
 
 
-# Convert to NumPy
-raw_datasets = pd_to_np(raw_datasets)
-
-# Run to convert back to Pandas
-raw_datasets = np_to_pd(raw_datasets)
-
-# # Check if its constructed correctly
-# print('Number of datasets: {}'.format(len(raw_datasets)))
-# print('Shape of first dataset: {}'.format(raw_datasets[dataset_labels[4]].shape))
-
-
-# Part 4 - Signal processing
-
-
 def get_frequencies(label):
 
     """Get relevant frequencies for given label based on whether its a frame or wheel dataset"""
@@ -345,19 +310,6 @@ def filtering(datasets_dic):
     return filtered_datasets
 
 
-filt_datasets = filtering(raw_datasets)
-filt_datasets = np_to_pd(filt_datasets)
-
-# # Check construction of filtered dataset
-# print('Num filtered datasets: {}'.format(len(filt_datasets)))
-# print('Shape of first filtered dataset: {}'.format(filt_datasets[dataset_labels[1]].shape))
-# print(filt_datasets[dataset_labels[0]].head())
-
-# # compare filtered and unfiltered data
-# dataset_compare(raw_datasets, dataset_labels[-1], filt_datasets, dataset_labels[-1],
-#                 'Z Accel', filtered=True)
-
-
 def create_nomotion_dataset(datasets):
 
     """
@@ -394,10 +346,6 @@ def create_nomotion_dataset(datasets):
     return nomotion_datasets, df
 
 
-# obtain no-motion data: dictionary of datasets & one combined dataset
-noMotion_datasets, noMotion_dataset = create_nomotion_dataset(filt_datasets)
-
-
 def trim_data(datasets):
 
     """
@@ -428,18 +376,6 @@ def trim_data(datasets):
         trim_datasets.update({label: dataset_})
 
     return trim_datasets
-
-
-# create a dictionary of dataframes with motion datasets only
-all_datasets = trim_data(filt_datasets)
-
-# add no-motion dataset to all the other datasets
-all_datasets.update({'no_motion': noMotion_dataset})
-
-# drop time columns
-for label, dataset in all_datasets.items():
-    dataset = dataset.drop(['Run Time', 'Epoch Time'], axis='columns')
-    all_datasets.update({label: dataset})
 
 
 def slice_window(datasets, overlap=True):
@@ -495,19 +431,6 @@ def slice_window(datasets, overlap=True):
     return seg_datasets, win_datasets
 
 
-# create a dictionary of segmented & windowed dataframes
-segmented_datasets, windowed_datasets = slice_window(all_datasets)
-
-# # Check if its constructed correctly
-# print('Total num segmented/windowed datasets: {}'.format(len(windowed_datasets)))
-# print('Num of segments (time windows) in first dataset: {}'.format(len(windowed_datasets[dataset_labels[0]])))
-# print('Shape of individual window in the first dataset: {}'.format(windowed_datasets[dataset_labels[0]][0].shape))
-# print('Shape of original dataframe in the first dataset: {}'.format(all_datasets[dataset_labels[0]].shape))
-# print('type of the first dataset:{}'.format(type(windowed_datasets[dataset_labels[0]])))
-# print('type of the first window in the first dataset:{}'.format(type(windowed_datasets[dataset_labels[0]][0])))
-# print('Example of a segmented dataframe')
-
-
 def win_plot(dic_1, dic_2):
     """ plotting two consecutive segmented/windowed dataframe """
 
@@ -523,13 +446,6 @@ def win_plot(dic_1, dic_2):
         j += 1
 
     plt.show()
-
-
-# UNCOMMENT TO COMPARE SEGMENTED & WINDOWED DATA
-# win_plot(segmented_datasets, windowed_datasets)
-
-
-# Part 6 - Transforms (FFT, PSD)
 
 
 def fft_transform(datasets):
@@ -574,16 +490,6 @@ def fft_transform(datasets):
     return fft_dic
 
 
-# create a dictionary containing lists of fft'd windowed segments
-fft_datasets = fft_transform(windowed_datasets)
-
-# # Check if fft_datasets are constructed correctly
-# print('Num of FFT\'d windowed datasets: {}'.format(len(fft_datasets)))
-# print('Num of FFT\'d windows in first dataset: {}'.format(len(fft_datasets[dataset_labels[0]])))
-# print('Shape of FFT\'d individual window: {}'.format(fft_datasets[dataset_labels[0]][0].shape))
-# print(fft_datasets[dataset_labels[0]][0].head())
-
-
 def psd_transform(datasets):
 
     """function to create a dictionary of all PSD'd dataframes"""
@@ -622,16 +528,6 @@ def psd_transform(datasets):
     return psd_dic
 
 
-# create a dictionary containing lists of psd'd windowed segments
-psd_datasets = psd_transform(segmented_datasets)
-
-# # Check if psd_datasets are constructed correctly
-# print('Num of PSD\'d windowed datasets: {}'.format(len(psd_datasets)))
-# print('Num of PSD\'d windows in first dataset: {}'.format(len(psd_datasets[dataset_labels[0]])))
-# print('Shape of PSD\'d individual window: {}'.format(psd_datasets[dataset_labels[0]][0].shape))
-# print(psd_datasets[dataset_labels[0]][0].head())
-
-
 def plot_transforms(fft_, psd_):
 
     """function to visualise a random window of a random dataset from fft/psd transforms"""
@@ -658,9 +554,6 @@ def plot_transforms(fft_, psd_):
     plt.show()
 
 
-# plot_transforms(fft_datasets, psd_datasets)
-
-
 def trim_transforms(datasets, freq_thresh):
 
     """function to remove excessive frequency bins of fft & psd dataframes"""
@@ -676,25 +569,6 @@ def trim_transforms(datasets, freq_thresh):
 
         datasets_trimmed.update({label: dataset_trimmed_list})
     return datasets_trimmed
-
-
-# trim fft & psd dataframes to keep useful frequencies only
-fft_datasets_trimmed = trim_transforms(fft_datasets, CUT_OFF + 10)
-psd_datasets_trimmed = trim_transforms(psd_datasets, CUT_OFF + 10)
-
-# # Check if fft_datasets are constructed correctly
-# print('Num of PSD\'d windowed datasets: {}'.format(len(fft_datasets_trimmed)))
-# print('Num of PSD\'d windows in first dataset: {}'.format(len(fft_datasets_trimmed[dataset_labels[0]])))
-# print('Shape of PSD\'d individual window: {}'.format(fft_datasets_trimmed[dataset_labels[0]][0].shape))
-# print(fft_datasets_trimmed[dataset_labels[0]][0].head())
-#
-# # compare trimmed & original fft datasets
-# print('full frequency range fft/psd datasets')
-# plot_transforms(fft_datasets, psd_datasets)
-# print('fft/psd trimeed datasets')
-# plot_transforms(fft_datasets_trimmed, psd_datasets_trimmed)
-
-# Part 7 - Feature Engineering
 
 
 def l2norm(array):
@@ -774,38 +648,6 @@ def feature_extraction(datasets, features_dic, freq_domain=False):
 time_features = {'Mean': np.mean, 'Std': np.std,  'Norm': l2norm,
                  'Max': np.amax, 'Min': np.amin, 'RMS': rms, 'ZCR': zcr}
 
-# create a dictionary of feature extracted dataframes
-time_featured_datasets = feature_extraction(segmented_datasets, time_features)
-
-# # Check if feature data is constructed correctly and print some info
-# print('Num datasets: {}'.format(len(time_featured_datasets)))
-# print('Num windows: {}'.format(len(time_featured_datasets[dataset_labels[1]])))
-# print('Shape of first dataset first column: {}'.format(time_featured_datasets[dataset_labels[1]]['X Accel'].shape))
-# print(time_featured_datasets[dataset_labels[1]]['X Accel'].head())
-
-
-def plot_set_features(datasets, dirn, feat_name):
-
-    """Plot extracted feature of one direction for all terrains"""
-
-    plt.clf()
-    plt.figure(figsize=(10, 8))
-
-    for label, dataset_fe in datasets.items():
-        plt.plot(dataset_fe[dirn][feat_name], label=label)
-
-    plt.ylabel(feat_name)
-    plt.xlabel('Window #')
-    plt.title(dirn)
-    plt.legend()
-    plt.show()
-
-
-# # Plot some time feature data
-# feat_datasets_to_plot = {label: dataset for label, dataset in time_featured_datasets.items()
-#                          if 'Middle' in label and 'Mahsa' in label and 'F8' in label}
-# plot_set_features(feat_datasets_to_plot, dirn='Z Accel', feat_name='Norm')
-
 
 def msf(freqs, psd_amps):
     """Mean square frequency"""
@@ -848,24 +690,6 @@ def rvf(freqs, psd_amps):
 
 # dictionary of freq-domain features to use in feature extraction step
 freq_features = {'RMSF': rmsf, 'FC': fc, 'RVF': rvf}
-
-# create a dictionary of freq-domain feature extracted dataframes
-freq_featured_datasets = feature_extraction(psd_datasets_trimmed, freq_features, freq_domain=True)
-
-# # Check if feature data is constructed correctly and print some info
-# print('Num datasets: {}'.format(len(freq_featured_datasets)))
-# print('Num directions: {}'.format(len(freq_featured_datasets[dataset_labels[0]])))
-# print('Shape of one direction: {}'.format(freq_featured_datasets[dataset_labels[0]]['X Accel'].shape))
-# print(freq_featured_datasets[dataset_labels[0]]['X Accel'].head())
-
-# # Plot some frequency feature data
-# feat_datasets_to_plot = {label: feature for label, feature in freq_featured_datasets.items()
-#                          if 'Mahsa' in label and 'F8' in label}
-# plot_set_features(feat_datasets_to_plot, dirn='Z Accel', feat_name='RMSF')
-
-
-# Part 8 - Columning, Combination, and Standardization of Datasets
-
 
 def append_all_columns(columns, append_tag):
 
@@ -910,20 +734,6 @@ def combine_extracted_columns(datasets):
     return combined_datasets
 
 
-# Take time feature data and combine axes columns
-columned_time_feat_datasets = combine_extracted_columns(time_featured_datasets)
-
-# # Confirm formatting
-# print(columned_time_feat_datasets[dataset_labels[0]].head())
-
-
-# Take frequency feature data and axes columns
-columned_freq_feat_datasets = combine_extracted_columns(freq_featured_datasets)
-
-# # Confirm formatting
-# print(columned_freq_feat_datasets[dataset_labels[0]].head())
-
-
 def get_transform(_label):
 
     """Get the transform used for given label"""
@@ -966,15 +776,6 @@ def combine_transform_columns(datasets, trans=''):
         combined_datasets.update({label: combined_df})
 
     return combined_datasets
-
-
-# create columned fft & psd datasets
-columned_fft_datasets = combine_transform_columns(fft_datasets_trimmed, 'FFT')
-columned_psd_datasets = combine_transform_columns(psd_datasets_trimmed, 'PSD')
-
-# # Confirm FFT/PSD formatting
-# print(columned_fft_datasets[dataset_labels[0]].head())
-# print(columned_psd_datasets[dataset_labels[0]].head())
 
 
 def get_terrain_num(_label):
@@ -1023,22 +824,57 @@ def insert_labels(datasets):
     return labeled_datasets
 
 
-# Add labels to each of the feature vector types
-labeled_time_feat_datasets = insert_labels(columned_time_feat_datasets)
-labeled_freq_feat_datasets = insert_labels(columned_freq_feat_datasets)
-labeled_fft_datasets = insert_labels(columned_fft_datasets)
-labeled_psd_datasets = insert_labels(columned_psd_datasets)
-
-# # Check labelled data
-# print(labeled_time_feat_datasets[dataset_labels[0]].head())
-
-
 def combine_datasets(datasets):
 
     """Combine data from labelled datasets into a single dataframe"""
 
     return pd.concat(list(datasets.values()), ignore_index=True)
 
+
+# Part 1 - Importing IMU measurements
+raw_datasets = imported_datasets(TeTr)  # create a dictionary of imported datasets
+raw_datasets = {label: raw_datasets[label] for label in sorted(raw_datasets.keys())}  # Sorting dictionary
+dataset_labels = list(raw_datasets.keys())  # list of all dataset labels/names
+
+# Part 2 - Signal processing
+filt_datasets = filtering(raw_datasets)
+filt_datasets = np_to_pd(filt_datasets)
+noMotion_datasets, noMotion_dataset = create_nomotion_dataset(filt_datasets) # trim no-motion data
+
+all_datasets = trim_data(filt_datasets)  # create a dictionary of non-stationary datasets
+all_datasets.update({'no_motion': noMotion_dataset})  # add no-motion dataset to all the other datasets
+
+# drop time columns
+for label, dataset in all_datasets.items():
+    dataset = dataset.drop(['Run Time', 'Epoch Time'], axis='columns')
+    all_datasets.update({label: dataset})
+
+# Part 3 - Slicing and windowing filtered data
+segmented_datasets, windowed_datasets = slice_window(all_datasets)  # create a dictionary of segmented/windowed dfs
+
+# Part 4 - Transforms (FFT, PSD)
+fft_datasets = fft_transform(windowed_datasets)  # create a dictionary containing lists of fft'd windowed segments
+psd_datasets = psd_transform(segmented_datasets)  # create a dictionary containing lists of psd'd windowed segments
+
+# trim fft & psd dataframes to keep useful frequencies only
+fft_datasets_trimmed = trim_transforms(fft_datasets, CUT_OFF + 10)
+psd_datasets_trimmed = trim_transforms(psd_datasets, CUT_OFF + 10)
+
+# Part 5 - Feature Engineering
+time_featured_datasets = feature_extraction(segmented_datasets, time_features)  # dictionary of feature extracted dfs
+freq_featured_datasets = feature_extraction(psd_datasets_trimmed, freq_features, freq_domain=True) #dic freq feature extracted dataframes
+
+# Part 6 - Columning, Combination, and Standardization of Datasets
+columned_time_feat_datasets = combine_extracted_columns(time_featured_datasets)  # Take time feature data and combine axes columns
+columned_freq_feat_datasets = combine_extracted_columns(freq_featured_datasets)  # Take frequency feature data and axes columns
+columned_fft_datasets = combine_transform_columns(fft_datasets_trimmed, 'FFT')  # create columned fft datasets
+columned_psd_datasets = combine_transform_columns(psd_datasets_trimmed, 'PSD')  # create columned psd datasets
+
+# Add labels to each of the feature vector types
+labeled_time_feat_datasets = insert_labels(columned_time_feat_datasets)
+labeled_freq_feat_datasets = insert_labels(columned_freq_feat_datasets)
+labeled_fft_datasets = insert_labels(columned_fft_datasets)
+labeled_psd_datasets = insert_labels(columned_psd_datasets)
 
 # For each feature vector, combine datasets in two single dataframes
 time_feats = combine_datasets(labeled_time_feat_datasets)
@@ -1047,15 +883,8 @@ ffts = combine_datasets(labeled_fft_datasets)
 psds = combine_datasets(labeled_psd_datasets)
 
 
-# # Check unnormalized data
-# print(freq_feats.tail())
-# print(time_feats.tail())
-# print(ffts.tail())
-# print(psds.tail())
-
 # Part 9 - Exporting Processed Data
-# Processed data path with power type folder
-processed_path = os.path.join(CURR_PATH, 'processed_data', TeTr)
+processed_path = os.path.join(CURR_PATH, 'processed_data', TeTr)  # Processed data path with power type folder
 os.makedirs(processed_path,exist_ok=True)
 
 # Store feature vectors in a dictionary
