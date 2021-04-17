@@ -14,7 +14,7 @@ import threading
 
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from scipy import signal, fft
+from scipy import signal
 
 import pandas as pd
 from joblib import load, dump
@@ -108,9 +108,12 @@ TIME_FREQ_FEATURES = {'Mean': np.mean, 'Std': np.std, 'Norm': l2norm, 'Max': np.
 TIME_FREQ_FEATURES_NAMES = ['Mean', 'Std', 'Norm', 'AC', 'Max', 'Min', 'RMS', 'ZCR', 'Skew', 'EK', 'MSF', 'RMSF', 'FC',
 							'VF', 'RVF']
 
-TERRAINS_OG = {'Concrete': 1, 'Carpet': 1, 'Linoleum': 1, 'Asphalt': 2, 'Sidewalk': 2, 'Grass': 3, 'Gravel': 4}
-TERRAINS_5C = ['No Motion', 'Indoor', 'Asphalt-Sidewalk', 'Grass', 'Gravel']
+TERRAINS_5C_dic = {'Concrete': 1, 'Carpet': 1, 'Linoleum': 1, 'Asphalt': 2, 'Sidewalk': 2, 'Grass': 3, 'Gravel': 4}
+TERRAINS_5C_ls = ['No Motion', 'Indoor', 'Asphalt-Sidewalk', 'Grass', 'Gravel']
+
+TERRAINS_IO_dic = {'Concrete': 1, 'Carpet': 1, 'Linoleum': 1, 'Asphalt': 2, 'Sidewalk': 2, 'Grass': 2, 'Gravel': 2}
 TERRAINS_IO = ['No Motion', 'Indoor', 'Outdoor']
+
 PERFORMANCE = {}
 
 
@@ -134,14 +137,6 @@ class ClTerrainClassifier:
 		self.placement = 'Middle'
 		self.sensorParam = FRAME_MODULE
 
-		# Left
-		# ~ self.placement = 'Left'
-		# ~ self.sensorParam = WHEEL_MODULE
-
-		# ~ # Right
-		# ~ self.placement = 'Right'
-		# ~ self.sensorParam = WHEEL_MODULE
-
 		print('unpickling')
 
 		self.RFTimelinePipeline = load('models/model.joblib')
@@ -151,12 +146,10 @@ class ClTerrainClassifier:
 		# Prepopulate pandas dataframe
 		EFTimeColumnNames = ['{} {} {}'.format(featName, direction, self.placement) for direction in DATA_COLUMNS for
 							 featName in TIME_FEATURES_NAMES]
-		self.EFTimeColumnedFeatures = pd.DataFrame(data=np.zeros((1, len(EFTimeColumnNames))),
-												   columns=EFTimeColumnNames)
+		self.EFTimeColumnedFeatures = pd.DataFrame(data=np.zeros((1, len(EFTimeColumnNames))), columns=EFTimeColumnNames)
 		EFFreqColumnNames = ['{} {} {}'.format(featName, direction, self.placement) for direction in DATA_COLUMNS for
 							 featName in FREQ_FEATURES_NAMES]
-		self.EFFreqColumnedFeatures = pd.DataFrame(data=np.zeros((1, len(EFFreqColumnNames))),
-												   columns=EFFreqColumnNames)
+		self.EFFreqColumnedFeatures = pd.DataFrame(data=np.zeros((1, len(EFFreqColumnNames))), columns=EFFreqColumnNames)
 		self.protocol = protocol
 
 		self.EFTimeFreqColumnedFeatures = pd.DataFrame(
@@ -173,7 +166,6 @@ class ClTerrainClassifier:
 		# Create class variables
 		self.windowIMUraw = np.zeros((self.sensorParam['wLength'] + 2 * PAD_LENGTH, 6))
 		self.windowIMUfiltered = np.zeros((self.sensorParam['wLength'], 6))
-		self.windowIMUFFT = np.zeros((f_ind,7))
 		self.windowIMUPSD = np.zeros((f_ind2,7))
 
 		# Create dictionary to house various active sensors and acivate specified sensors
@@ -194,8 +186,6 @@ class ClTerrainClassifier:
 		# Start terrain classification in separate thread
 		terrain = Thread(target=self.fnTerrainClassification, args=(CLASS_FREQ,))
 		terrain.start()
-
-		timeStart = time.time()
 
 		# Create dictionary to store processes
 		processes = {}
@@ -253,12 +243,6 @@ class ClTerrainClassifier:
 			# Build extracted feature vector
 			self.fnBuildTimeFeatures(TIME_FEATURES_NAMES)
 
-			## Build PSD and PSD features
-			#self.fnBuildPSD(self.windowIMUfiltered)
-			## Build FFT feature
-			#self.fnBuildFFT(self.windowIMUfiltered)
-			## Build frequency features
-			#self.fnBuildFreqFeatures(FREQ_FEATURES_NAMES)
 
 			# terrainTypeRFTime = self.RFTimelinePipeline.predict(self.EFTimeColumnedFeatures)
 			terrainTypeRFTime = self.RFTimelinePipeline.predict(np.append(self.EFTimeColumnedFeatures,
@@ -266,7 +250,7 @@ class ClTerrainClassifier:
 
 			try:
 				print('Prediction: {0:>10s}'.format(TERRAINS_IO[terrainTypeRFTime[0]]))
-				self.RFResults = self.RFResults.append({"True Label": TERRAINS_OG[self.testSet[1]],
+				self.RFResults = self.RFResults.append({"True Label": TERRAINS_IO_dic[self.testSet[1]],
 														"RF Time": terrainTypeRFTime[0], "Time": time.time()}, ignore_index=True)
 			except Exception as e:
 				print(e)
@@ -288,7 +272,7 @@ class ClTerrainClassifier:
 
 		y_pred = self.RFResults["RF Time"].to_numpy(dtype=np.int8)
 		print(y_pred.shape)
-		y_test = TERRAINS_OG[self.testSet[1]] * np.ones(len(y_pred), dtype=np.int8)
+		y_test = TERRAINS_IO_dic[self.testSet[1]] * np.ones(len(y_pred), dtype=np.int8)
 		print(y_test.shape)
 
 		print(accuracy_score(y_test, y_pred))
@@ -323,38 +307,6 @@ class ClTerrainClassifier:
 		for i in range(6):
 			self.windowIMUfiltered[:, i] = signal.sosfiltfilt(sos, dataSet[:, i])[
 										   PAD_LENGTH:self.sensorParam['wLength'] + PAD_LENGTH]  # *hanningWindow
-
-	def fnBuildFFT(self, dataWindow):
-		"""
-		Purpose:	Builds power spectrum densities for each direction
-		Passed:		Filtered IMU data
-		"""
-
-		# number of sample points
-		N = self.sensorParam['wLength']
-
-		# sample spacing
-		T = 1 / self.sensorParam['fSamp']
-
-		# frequency bin centers
-		xf = fft.fftfreq(N, T)[:N // 2]
-
-		window_fft = np.zeros((round(N / 2), 6))
-
-		hanningWindow = np.hanning(self.sensorParam['wLength'])
-
-		for i in range(6):
-			window_fft[:, i] = fft.fft(dataWindow[:, i] * hanningWindow)[0:int(N/2)]
-			window_fft[:, i] = 2.0 / N * abs(window_fft[:, i])  # keeping positive freq values * 2 / window_size
-		# Get positive frequency bins for given FFT parameters
-
-		freq_col = np.reshape(xf, (-1, 1))
-
-		f_ind = np.ceil((CUT_OFF + 10) / self.sensorParam['fSamp'] * 2 * self.sensorParam['wLength']/2).astype(int)
-		#f_bool = freq_col <= CUT_OFF + 10
-
-		# Append the frequency column
-		self.windowIMUFFT = np.append(window_fft[0:f_ind+1, :], freq_col[0:f_ind+1], axis=1)
 
 	def fnBuildPSD(self, dataWindow):
 		"""
