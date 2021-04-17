@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from mlxtend.plotting import plot_sequential_feature_selection as plot_sfs
 from sklearn.metrics import plot_confusion_matrix
 
-# preprocessing
+# pre-processing
 from sklearn.model_selection import train_test_split
 
 # Evaluation metrics
@@ -219,14 +219,14 @@ def sfs_eval(model_,xtest):
 train_datasets_dic = dic_feats(TRAIN_PATH)
 test_datasets_dic = dic_feats(TEST_PATH)
 
-# add new labels to the dataset
+# Add new labels to the dataset
 train_datasets_dic = relabel_io(train_datasets_dic)
 test_datasets_dic = relabel_io(test_datasets_dic)
 
-# create train set
+# prepare train set
 X_train, X_test_, y_train, y_test_ = create_train_test(train_datasets_dic[CLASS_FEATS], LABELS, test_size=1)
 
-# create test set
+# prepare test set
 X_train_, X_test, y_train_, y_test = create_train_test(test_datasets_dic[CLASS_FEATS], LABELS,
                                                        test_size=len(test_datasets_dic[CLASS_FEATS]) - 1)
 
@@ -238,17 +238,9 @@ model_name = os.path.join(model_path, 'model.joblib')
 rf_model = joblib.load(model_name)  # load model
 
 # Part 4 - Evaluation
-
-plt_confusion_matrix(rf_model, X_test, y_test, LABELS)
-# get parameters of the best model
-print("Best estimator via GridSearch \n", rf_model.best_estimator_)
-
-# Part 5 - GridSearch Summary
-# Mean cross-validated score of the best_estimator
-print('Best feature combination had a CV accuracy of:', rf_model.best_score_)
-
-# Model best parameters
-print("Best parameters via GridSearch \n", rf_model.best_params_)
+plt_confusion_matrix(rf_model, X_test, y_test, LABELS)  # plot confusion matrix
+print("Best estimator via GridSearch \n", rf_model.best_estimator_)  # get parameters of the best model
+print("Best parameters via GridSearch \n", rf_model.best_params_) # Model best parameters
 
 # Part 6 - Feature selection summary
 sfs_eval(rf_model, X_test)
