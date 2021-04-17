@@ -757,4 +757,4 @@ if EXPORT_PROCESSED_DATA:
         filename = os.path.join(processed_path, vector_name + '.csv')
         vector_data.to_csv(filename, index=False)
 
-print("\n Success")
+print("\n Finished Successfully")
