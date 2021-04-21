@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 """
 Author:         Mahsa Khalili
 Date:           2021 April 15th
@@ -63,7 +66,6 @@ CUT_OFF = 20  # Low-pass cut-off frequency (Hz)
 # dictionary of time-domain features to use in feature extraction step
 time_features = {'Mean': np.mean, 'Std': np.std,  'Norm': l2norm,
                  'Max': np.amax, 'Min': np.amin, 'RMS': rms, 'ZCR': zcr}
-
 
 # dictionary of freq-domain features to use in feature extraction step
 freq_features = {'RMSF': rmsf, 'FC': fc, 'RVF': rvf}

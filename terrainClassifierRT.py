@@ -97,7 +97,7 @@ TIME_FEATURES = {'Mean': np.mean, 'Std': np.std, 'Norm': l2norm, 'Max': np.amax,
 TIME_FEATURES_NAMES = ['Mean', 'Std', 'Norm', 'Max', 'Min', 'RMS', 'ZCR']
 
 # Time domain feature functions and names           
-FREQ_FEATURES = freq_features = {'MSF': msf, 'RMSF': rmsf, 'FC': fc, 'VF': vf, 'RVF': rvf}
+FREQ_FEATURES = freq_features = {'RMSF': rmsf, 'FC': fc, 'RVF': rvf}
 
 FREQ_FEATURES_NAMES = ['RMSF', 'FC', 'RVF']
 
